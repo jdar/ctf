@@ -1,0 +1,69 @@
+\documentclass{article}
+\usepackage[cm]{fullpage}
+
+\begin{document}
+\title{\LARGE{\textsc{Capture The Flag API Reference}}\\\large{HacDC NARG}}
+\maketitle
+This document is intended to give the reader an overview of the API available to them when coding a Capture The Flag agent or team. The methods in this document are to be considered the only legal methods available for the competition. As of the writing of this document there are some inherited methods that allow for unfair advantages in competition. These commands will remain undocumented in hopes that programmers entering the competition will honor the competition's rules. 
+\section*{Agent Methods}
+Agent methods are broken into three classes: action, sensor and inherited methods. Agent action methods are methods that an agent can execute to change its behavior. Sensor methods are methods that may be used by agents to sense their environment. Inherited methods are methods provided by the ``Real" class to provide spatial data about the agent.
+\subsection*{Action Methods}
+	\begin{itemize}
+		\item\verb|CTFPlayer|\textbf{.turnLeft}( )\\
+		Turns the agent 0.03 degrees left for that unit in time. Returns nothing.
+		\item\verb|CTFPlayer|\textbf{.turnRight}( )\\
+		Turns the agent 0.03 degrees right for that unit in time. Returns nothing.
+		\item\verb|CTFPlayer|\textbf{.setSpeed}( \emph{speed} )\\
+		Sets an agents speed to \emph{speed}. The \emph{speed} argument is limited to a range from 0.0 to 1.0 inclusive. Returns nothing.
+		\item\verb|CTFPlayer|\textbf{.decelerate}(  )\\
+		Decelerates the agent by 0.1 speed units. Returns nothing.
+		\item\verb|CTFPlayer|\textbf{.decelerate}(  )\\
+		Accelerates the agent by 0.1 speed units. Returns nothing.		
+	\end{itemize}
+\subsection*{Sensor Methods}
+	\begin{itemize}
+		\item\verb|CTFPlayer|\textbf{.getIdNumber}( )\\
+		Returns the id number of the agent.
+		\item\verb|CTFPlayer|\textbf{.senseMyTeam}( )\\
+		Returns a list of the agent's teammates within range, or an empty list.
+		\item\verb|CTFPlayer|\textbf{.senseOtherTeam}( )\\
+		Returns a list of the agent's opponents within range, or an empty list.
+		\item\verb|CTFPlayer|\textbf{.senseMyFlag}( )\\
+		Returns the agent's own flag if it is within sensor range, or \verb|None|.
+		\item\verb|CTFPlayer|\textbf{.senseOtherFlag}( )\\
+		Returns the opponent's flag if it is within sensor range, or \verb|None|.
+		\item\verb|CTFPlayer|\textbf{.senseMyJail}( )\\
+		Returns the agent's own jail if it is within sensor range, or \verb|None|.
+		\item\verb|CTFPlayer|\textbf{.senseOtherJail}( )\\
+		Returns the opponent's flag if it is within sensor range, or \verb|None|.
+		\item\verb|CTFPlayer|\textbf{.getMyHomeLocation}( )\\
+		Returns the closest point to the agent on the agent's home-side in breve vector form.
+		\item\verb|CTFPlayer|\textbf{.getOtherHomeLocation}( )\\
+		Returns the closest point to the agent on the opponent's side in breve vector form.
+		\item\verb|CTFPlayer|\textbf{.getAnge}( \emph{point} )\\
+		Returns the angle from the agent's present location to the specified point. If the angle is positive \emph{point} is to the right of the agent. If the angle is negative \emph{point} is to the left of the agent.
+	\end{itemize}
+\subsection*{Inherited Methods}
+	\begin{itemize}
+		\item\verb|CTFPlayer|\textbf{.getLocation}( )\\
+		Returns the location of the agent in breve vector form.
+	\end{itemize}
+\section*{Controller Methods}
+Controller methods are methods that inform an agent about the state of the overall game. These methods can be called from within the agent by using the \verb|self.controller| object.
+\begin{itemize}
+	\item\verb|CTFController|\textbf{.getTime}( )\\
+	Returns the simulation time of the world. 
+	\item\verb|CTFController|\textbf{.getGameTime}( )\\
+	Returns the simulation time from the start of the match.
+	\item\verb|CTFController|\textbf{.getJailedRedCount}( )\\
+	Returns the number of red agents in jail. 
+	\item\verb|CTFController|\textbf{.getJailedBlueCount}( )\\
+	Returns the number of blue agents in jail.
+	\item\verb|CTFController|\textbf{.getRedWins}( )\\
+	Returns the number of red wins so far in the tournament.
+	\item\verb|CTFController|\textbf{.getBlueWins}( )\\
+	Returns the number of blue wins so far in the tournament.
+	\item\verb|CTFController|\textbf{.getTies}( )\\
+	Returns the number of ties so far in the tournament. 
+\end{itemize}
+\end{document}
