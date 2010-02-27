@@ -292,10 +292,6 @@ class CTFMobile(breve.Mobile):
 
     def setTeam(self, team):
         self.team = team
-        if team == 1: 
-            self.controller.setDisplayText('$self is Red', -.95, .8, 1)
-        else: 
-            self.controller.setDisplayText('$self is Blue', -.95, .7, 2)
 
     def getTeam(self):
         return self.team
@@ -303,7 +299,7 @@ class CTFMobile(breve.Mobile):
     def checkIfOffsides(self):
         if self.team == 1 and self.getLocation().x < 0.0:
             return True
-        elif self.team == 0 and self.getLocation().x >0.0:
+        elif self.team == 0 and self.getLocation().x > 0.0:
             return True
         else:
             return False

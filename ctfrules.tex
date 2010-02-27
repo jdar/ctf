@@ -1,0 +1,44 @@
+\documentclass{article}
+\usepackage[cm]{fullpage}
+
+\begin{document}
+\title{\LARGE{\textsc{Capture The Flag}}\\\large{HacDC NARG}}
+\maketitle
+\section*{The Playing Field}
+	\begin{itemize}
+		\item Two teams of 10 players compete, Red and Blue.
+		\item The playing field is a 50 by 50 unit plane centered on the origin, (0, 0, 0).
+		\item Blue home-side is the negative side of the X-axis.
+		\item Red home-side is on the positive side of the X-axis.
+	\end{itemize}
+\section*{Gameplay}
+	\begin{itemize}
+		\item If a player is tagged offsides, the player is sent to jail.
+		\item If a player tags the jail on the other team's side, all of the jailed teammates are freed. The freed teammates are automatically zapped back to random locations on their home-side (``Free Walkbacks"). The agent that tagged the jail does not automatically return home.
+		\item Agents cannot move their team's own flag.
+		\item When the game starts, each flag is surrounded by a ``safe zone" in which offsides players cannot be tagged. This zone is static and vanishes once the flag is removed from the zone.
+		\item The game is over when one of the following conditions has been met:
+			\begin{itemize}
+				\item One team's flag has been carried to the other team's side.
+				\item All players from one team have been captured.
+				\item 500 time units have elapsed.
+			\end{itemize}
+		\item The winning team is the team that:
+			\begin{itemize}
+				\item Captures the other team's flag.
+				\item Captures all of the other team's players.
+			\end{itemize}
+	\end{itemize}
+\section*{Tournament}
+	\begin{itemize}
+		\item There are five games in a tournament. 
+		\item The winner of a tournament is the team that has won the most individual games in the tournament. 
+	\end{itemize}
+\section*{Agents}
+	\begin{itemize}
+		\item Agents have a maximum speed of 1.0 distance units per unit time.
+		\item The agent's sensor range is 20 distance units.
+	\end{itemize}
+\section*{Technical Details}
+	This part will come when I start messing with some security precautions and auto-tournament codes. 
+\end{document}
