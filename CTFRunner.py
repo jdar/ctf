@@ -20,4 +20,14 @@ class CTFRunner(base.CTFController):
             member.setTeam(1)
             self.red_team.append(member)
 
+    def roundRobin(self, team=None):
+	    if team:
+    	    for bot in set(bots) - set(team):
+                self.blue_team = team
+                self.red_team = bot
+        else:
+            bots.roundRobin()
+        
+        something = "output function goes here"
+
 CTFRunner()
