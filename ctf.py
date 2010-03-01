@@ -125,13 +125,13 @@ class CTFController(breve.Control):
         self.blue_flag = Flag()
         self.blue_flag.setTeam(BLUE_TEAM)
         self.blue_flag.move(breve.vector((-1 * WORLD_SIZE / 2) + 5, 1, 0) + randomness)
-        self.blue_flag.makeBounds()
+        self.blue_flag.makeNoTagZone()
         self.blue_flag.setStartPosition(self.blue_flag.getLocation())
 
         self.red_flag = Flag()
         self.red_flag.setTeam(RED_TEAM)
         self.red_flag.move(breve.vector((WORLD_SIZE / 2) - 5, 1, 0) + randomness)
-        self.red_flag.makeBounds()
+        self.red_flag.makeNoTagZone()
         self.red_flag.setStartPosition(self.red_flag.getLocation())
  
     def getBlueJailLocation(self):
@@ -355,11 +355,11 @@ class CTFController(breve.Control):
 
             # If the blue flag has moved, kill the no tag zone.
             if self.blue_flag.hasMoved():
-                self.blue_flag.killTheSphere()
+                self.blue_flag.killNoTagZone()
 
             # If the red flag has moved, kill the no tag zone.
             if self.red_flag.hasMoved():
-                self.red_flag.killTheSphere()
+                self.red_flag.killNoTagZone()
 
             # If all the red players were captured, report a win for blue.
             # Log end time.
@@ -437,17 +437,31 @@ class AgentShape(breve.CustomShape):
         self.finishShape(1.0)
 
 class CTFMobile(breve.Mobile): 
+    """
+    The class of anything that can move and has a team in the sim.
+    """
     def __init__(self):
         breve.Mobile.__init__(self)
+        # set the team to unknown
         self.team = -1
 
     def setTeam(self, team):
+        """
+        Sets the team to the specified team number.
+        """
         self.team = team
 
     def getTeam(self):
+        """
+        Returns the team number.
+        """
         return self.team
 
     def checkIfOffsides(self):
+        """
+        Returns true if this mobile is offsides,
+        false otherwise.
+        """
         if self.team == 1 and self.getLocation().x < 0.0:
             return True
         elif self.team == 0 and self.getLocation().x > 0.0:
@@ -456,9 +470,20 @@ class CTFMobile(breve.Mobile):
             return False
 
 class Jail(CTFMobile):
+    """
+    Class for the CTF Jails.
+    """
+    # Static variable used to count the number of instances
+    # Since this class is not a builtin breve class we must
+    # take care of the count on our own.
     jails = []
 
     def __init__(self):
+        """
+        Initializes the jail. Sets shape and color,
+        and moves it to the right spot.
+        """
+        # Again, always call the parent's initalizer explicitly.
         CTFMobile.__init__(self)
         shape = breve.createInstances(breve.Cube, 1)
         shape.initWith(breve.vector(3, 1, 3))
@@ -468,34 +493,76 @@ class Jail(CTFMobile):
         Jail.jails.append(self)
 
     def jailBreak(self):
+        """
+        Frees all of the agents in the jail.
+        This method is executed when a collision is 
+        detected between an agent and a jail.
+        """
+        # Cheat and do a super free for all team 
+        # members. The team members see if they 
+        # need to be freed.
         for item in CTFPlayer.players:
             if (item.getTeam()) == self.team:
                 item.getFreed()
 
 class Flag(CTFMobile):
+    """
+    Flag class. Handles shape and non-tag zone
+    and carry methods.
+    """
+    # Again, we need to keep track of these since
+    # breve doesn't.
     flags = []
 
     def __init__(self):
+        """
+        Initalizes the variables for the flag object.
+        Calls proper initalizer.
+        """
+        # Parent initalization
         CTFMobile.__init__(self)
+
+        # Variable initalization
         self.carrier = None
         self.image = None
         self.start_position = breve.vector()
-        self.my_sphere = None
+        self.my_no_tag_zone = None
+
+        # Flag initalization
         self.init()
+        # Just ot keep track of the flags.
         Flag.flags.append(self)
 
     def getCarrier(self):
+        """
+        Returns the carrier of the flag.
+        None if there is no carrier.
+        """
         return self.carrier
 
     def setCarrier(self, carrier):
+        """
+        Sets the carrier of the flag.
+        """
         self.carrier = carrier
 
-    def killTheSphere(self):
-        if self.my_sphere:
-            breve.deleteInstances(self.my_sphere)
-            self.my_sphere = None
+    def killNoTagZone(self):
+        """
+        Destroys the no tag zone around the flag.
+        """
+        if self.my_no_tag_zone:
+            # A call to the breve engine to delete the 
+            # no tag zone. del won't do it here...
+            breve.deleteInstances(self.my_no_tag_zone)
+            self.my_no_tag_zone = None
 
     def hasMoved(self):
+        """
+        Returns true if the flag has moved 5 or more units.
+        False otherwise. Used to tell if/when to kill the 
+        no tag zone.
+        """
+        # Vectors have a length method!
         distance = (self.getLocation() - self.start_position).length()
         if distance >= 5:
             return True
@@ -503,33 +570,64 @@ class Flag(CTFMobile):
             return False
 
     def setStartPosition(self, vector):
+        """
+        Remembers the starting position of the flag.
+        Used to tell if the flag has moved.
+        """
         self.start_position = vector
 
     def setSphere(self, sphere):
-        self.my_sphere = sphere
+        """
+        Sets the no tag zone sphere for a flag.
+        """
+        self.my_no_tag_zone = sphere
 
     def resetFlag(self):
+        """
+        Resets the flag and no tag zone.
+        """
+        # Reset starting location and carrier.
         self.start_position = self.getLocation()
         self.setCarrier(None)
-        if self.my_sphere:
-            self.killTheSphere()
-        self.makeBounds()
-        self.my_sphere.move(self.getLocation())
 
-    def makeBounds(self):
-        self.my_sphere = breve.createInstances(FlagSphere, 1)
-        self.my_sphere.move(self.getLocation())
+        # If there is a no tag zone, kill it and 
+        # make a fresh one.
+        if self.my_no_tag_zone:
+            self.killNoTagZone()
+        self.makeNoTagZone()
+
+        # Move the sphere to the location of the flag.
+        self.my_no_tag_zone.move(self.getLocation())
+
+    def makeNoTagZone(self):
+        """
+        Makes the no tag zone.
+        """
+        self.my_no_tag_zone = breve.createInstances(NoTagZone, 1)
+        self.my_no_tag_zone.move(self.getLocation())
 
     def init(self):
+        """
+        Makes the flag and sets its shape and image.
+        """
+        # make a shape and set the flag to that shape
         shape = breve.createInstances(breve.Sphere, 1)
         shape.initWith(1.5)
         self.setShape(shape)
 
+        # set image
         image = breve.createInstances(breve.Image, 1)
         image.load('images/star.png')
         self.setBitmapImage(image)
 
     def move(self, location):
+        """
+        Makes sure the flag doesn't go off the end of the world.
+        Then calls the standard mobile move function.
+        """
+        # All checks for the edge of the world
+        # If we want to change the board size we need
+        # to change these accordingly.
         if location.x > WORLD_SIZE / 2:
             location.x = WORLD_SIZE / 2
         if location.x < -WORLD_SIZE / 2:
@@ -539,29 +637,46 @@ class Flag(CTFMobile):
         if location.z < -WORLD_SIZE / 2:
             location.z = -WORLD_SIZE / 2
 
+        # Call to parent class's move function
         CTFMobile.move(self, location)
 
-class FlagSphere(breve.Mobile):
-    flag_spheres = []
+class NoTagZone(breve.Mobile):
+    """
+    The no tag zone class.
+    Used only for visualization.
+    """
+    # Keep track of our instances
+    no_tag_zones = []
 
     def __init__(self):
+        """
+        Initalizes the NoTagZone.
+        """
+        # Parent constructor call, still needed.
         breve.Mobile.__init__(self)
-        shape = None
-        self.init()
-        FlagSphere.flag_spheres.append(self)
-
-    def init(self):
         shape = breve.createInstances(breve.Sphere, 1)
         shape.initWith(5)
         self.setShape(shape)
         self.setTransparency(.2)
         self.setColor(breve.vector(0, 0, 0))
+        NoTagZone.no_tag_zones.append(self)
 
 class CTFPlayer(CTFMobile):
+    """
+    CTFPlayer class. Has all of the agent callable methods.
+    """
+    # Again, keep track
     players = []
 
     def __init__(self):
+        """
+        Initalizes all of the variables for the CTFPlayer.
+        Then initalizes it.
+        """
+        # Parent constructor call. Necissary.
         CTFMobile.__init__(self)
+
+        # Variable initalization
         self.shape = None
         self.velocity = 0.0
         self.angle = 0.0
@@ -575,19 +690,30 @@ class CTFPlayer(CTFMobile):
         self.jailed_location = breve.vector()
         self.id_number = 0
 
+        # Initalization and instance storage.
         self.init()
         CTFPlayer.players.append(self)
 
     def init(self):
+        """
+        Initalizes the CTFPlayer.
+        """
+        # Set the heading and get id numbers from the controller.
+        # Oh right, all objects have a link to the controller class
+        # in breve. This makes it easy to cheat. Don't. I'll be sad.
         self.heading = breve.vector(1, 0, 0)
         self.id_number = self.controller.getNextIdNumber(self)
 
+        # create a shape and set the players shape to that shape.
         shape = AgentShape()
         self.setShape(shape)
 
+        # set up collision handlers
         self.handleCollisions('Flag', 'pickUp')
         self.handleCollisions('Jail', 'jailBreak')
 
+        # set up collision handling with other agents.
+        # we don't want to tag our own team do we?
         for item in CTFPlayer.players:
             item_type = item.getType()
             self_type = self.getType()
@@ -596,18 +722,28 @@ class CTFPlayer(CTFMobile):
                 item.handleCollisions(self_type, 'tagAgent')
                 self.handleCollisions(item_type, 'tagAgent')
 
+        # Point ourselves in a random direction.
         self.setAngle(breve.randomExpression(6.29))
 
     def resetPlayer(self):
+        """
+        Resets the player to a beginning of a match state.
+        """
         self.moveToHomeside()
         self.in_jail = False
         self.drop()
-        self.carrying = None
 
     def getIdNumber(self):
+        """
+        Returns the id number of this player.
+        """
         return self.id_number
 
     def setTeam(self, n):
+        """
+        Sets the players team and color.
+        Also moves the agent to the proper side.
+        """
         CTFMobile.setTeam(self, n)
         
         if self.team == 1:
@@ -618,9 +754,18 @@ class CTFPlayer(CTFMobile):
         self.moveToHomeside()
 
     def getInJail(self):
+        """
+        Returns true if the player is in jail.
+        False otherwise.
+        """
         return self.in_jail
 
     def moveToHomeside(self):
+        """
+        Moves a player to a random location on its home side.
+        """
+        # r = random
+        # o = offset (offsets change depending on the side of the board)
         r = breve.vector(WORLD_SIZE/4, 0, WORLD_SIZE)
         o = breve.vector()
 
@@ -631,19 +776,30 @@ class CTFPlayer(CTFMobile):
             o = breve.vector(-WORLD_SIZE/4, 0, -WORLD_SIZE/2)
             self.team_home = breve.vector(-1, 0, 0)
 
+        # Move the agent to random+offset location.
         self.move(breve.randomExpression(r)+o)
 
     def getMyHomeLocation(self):
+        """
+        Returns the closest point to the players home side if 
+        the player is offsides, otherwise it returns the players
+        location.
+        """
         location = self.getLocation()
 
         if not self.checkIfOffsides():
             return location
-        
+         
         location.x = 0
 
         return location
 
     def getOtherHomeLocation(self):
+        """
+        Returns the closest point to the opponents side if 
+        the player is home, otherwise it returns the players
+        location.
+        """
         location = self.getLocation()
 
         if self.checkIfOffsides():
@@ -653,76 +809,117 @@ class CTFPlayer(CTFMobile):
 
         return location
 
-    def setTurningLeft(self, i):
-        self.turning_left = i
-
-    def setTurningRight(self, i):
-        self.turning_right = i
-
     def getHeading(self):
+        """
+        Returns the heading of the player.
+        """
         return self.heading
 
     def hasFlag(self):
+        """
+        Returns true if the player is carrying the flag,
+        false otherwise.
+        """
         if self.carrying:
             return True
         else:
             return False
 
     def pickUp(self, flag):
+        """
+        Collision handler with flag.
+        Makes the player pick up the flag.
+        """
+        # make sure we don't move our flag.
         if flag.getTeam() == self.team:
             return
 
+        # make sure no one else is holding the flag.
         if flag.getCarrier() != None:
             return
 
+        # make sure we're not in jail.
         if self.in_jail:
             return
 
+        # make sure we aren't carrying the flag already.
         if self.carrying == None:
+            # ok carry the flag, and let the flag know we're carrying it.
             self.carrying = flag
             flag.setCarrier(self)
 
     def drop(self):
+        """
+        Drops the flag.
+        """
+        # If we're carrying the flag.
         if self.carrying != None:
+            # Let the flag know we're dropping it.
             self.carrying.setCarrier(None)
 
+        # drop the flag.
         self.carrying = None
 
     def tagAgent(self, agent):
+        """
+        Collision handler with other players.
+        Tags them and sends them to jail, or vice versa.
+        """
+        # cant tag friends
         if agent.getTeam() == self.getTeam():
             return
 
-        if self.tooCloseToFlag():
+        # Can't tag in the no tag zone
+        if self.inNoTagZone():
             return
 
+        # if we're offsides drop the flag and go to jail.
         if agent.checkIfOffsides():
             agent.drop()
             agent.goToJail()
 
     def goToJail(self):
+        """
+        Puts the player in jail.
+        """
+        # if we're in jail we don't need to go to jail
         if self.in_jail:
             return
 
+        # set out in_jail flag to true
         self.in_jail = True
 
+        # stick yourself in a random spot in red prison.
+        # Add one to the capture count
         if self.team == 1:
             self.jailed_location = self.controller.getRedJailLocation()
             self.jailed_location += breve.randomExpression(breve.vector(1, 0, 1))
             self.jailed_location -= breve.vector(.5, -.5, .5)
             self.controller.changePrisoners(RED_TEAM, 1)
+        # stick yourself in a random spot in red prison.
+        # Add one to the capture count
         else:
             self.jailed_location = self.controller.getBlueJailLocation()
             self.jailed_location += breve.randomExpression(breve.vector(1, 0, 1))
             self.jailed_location -= breve.vector(.5, -.5, .5)
             self.controller.changePrisoners(BLUE_TEAM, 1)
 
+        # Move to that location
         self.move(self.jailed_location)
 
     def jailBreak(self, jail):
+        """
+        Collision handler with jails.
+        Frees the prisoners.
+        """
+        # If its the right jail and I'm not in jail, jailbreak
         if not self.in_jail and jail.getTeam() == self.team:
             jail.jailBreak()
 
-    def tooCloseToFlag(self):
+    def inNoTagZone(self):
+        """
+        Returns true if in the no tag zone, false otherwise.
+        """
         myFlag = self.senseMyFlag()
         if myFlag != None:
             distance = breve.length(self.getLocation() - myFlag.getLocation())
@@ -732,24 +929,39 @@ class CTFPlayer(CTFMobile):
                 return False
 
     def getFreed(self):
+        """
+        Frees the player, and teleports them home.
+        """
+        # don't need freeing if we aren't in jail
         if not self.in_jail: 
             return
 
+        # move home and toggle the in_jail flag
         self.moveToHomeside()
         self.in_jail = False
 
+        # Update the prisoner count
         if self.team == 1:
             self.controller.changePrisoners(RED_TEAM, -1)
         else:
             self.controller.changePrisoners(BLUE_TEAM, -1)
 
     def accelerate(self):
+        """
+        Accelerates the player by 0.1 velocity units.
+        """
         self.setSpeed(self.velocity + 0.1)
 
     def decelerate(self):
+        """
+        Decelerates the player by 0.1 velocity units.
+        """
         self.setSpeed(self.velocity - 0.1)
 
     def setSpeed(self, value):
+        """
+        Sets the speed of the player (between 0 and 1 inclusive).
+        """
         self.velocity = value
 
         if self.velocity > 1.0:
@@ -758,18 +970,31 @@ class CTFPlayer(CTFMobile):
             self.velocity = 0.0
 
     def setAngle(self, angle):
+        """
+        Sets the angle of the agent for turning purposes.
+        Internal use only.
+        """
         self.angle = angle
 
         self.setRotation(breve.vector(-1, 0, 0), 1.57)
         self.relativeRotate(breve.vector(0, -1, 0), angle)
 
     def turnLeft(self):
+        """
+        Turns the player left.
+        """
         self.setAngle(self.angle - 0.03)
 
     def turnRight(self):
+        """
+        Turns the player right.
+        """
         self.setAngle(self.angle + 0.03)
 
     def senseMyJail(self):
+        """
+        Returns the players jail if within sensor range, none otherwise.
+        """
         for item in Jail.jails:
             distance = breve.length(self.getLocation() - item.getLocation()) 
             if item.getTeam() == self.team and distance < SENSOR_DISTANCE:
@@ -777,6 +1002,9 @@ class CTFPlayer(CTFMobile):
         return None
 
     def senseOtherJail(self):
+        """
+        Returns the opponents jail if within sensor range, none otherwise.
+        """
         for item in Jail.jails:
             distance = breve.length(self.getLocation() - item.getLocation()) 
             if item.getTeam() != self.team and distance < SENSOR_DISTANCE:
@@ -784,6 +1012,9 @@ class CTFPlayer(CTFMobile):
         return None
 
     def senseMyFlag(self):
+        """
+        Returns the players flag if within sensor range, none otherwise.
+        """
         for item in Flag.flags:
             distance = breve.length(self.getLocation() - item.getLocation()) 
             if item.getTeam() == self.team and distance < SENSOR_DISTANCE:
@@ -791,6 +1022,9 @@ class CTFPlayer(CTFMobile):
         return None
 
     def senseOtherFlag(self):
+        """
+        Returns the opponents flag if within sensor range, none otherwise.
+        """
         for item in Flag.flags:
             distance = breve.length(self.getLocation() - item.getLocation()) 
             if item.getTeam() != self.team and distance < SENSOR_DISTANCE:
@@ -798,22 +1032,33 @@ class CTFPlayer(CTFMobile):
         return None
 
     def senseMyTeam(self):
+        """
+        Returns all teammates within sensor range or an empty list.
+        """
         result = []
         for item in CTFPlayer.players:
             distance = breve.length(self.getLocation() - item.getLocation()) 
-            if item.getTeam() == self.team and not item.getInJail() and distance < SENSOR_DISTANCE:
+            if item.getTeam() == self.team and not item.getInJail() \
+                    and distance < SENSOR_DISTANCE:
                 result.append(item)
         return result 
 
     def senseOtherTeam(self):
+        """
+        Returns all opponents within sensor range or an empty list.
+        """
         result = []
         for item in CTFPlayer.players:
             distance = breve.length(self.getLocation() - item.getLocation()) 
-            if item.getTeam() != self.team and not item.getInJail() and distance < SENSOR_DISTANCE:
+            if item.getTeam() != self.team and not item.getInJail() \
+                    and distance < SENSOR_DISTANCE:
                 result.append(item)
         return result 
 
     def getClosestOpponent(self):
+        """
+        Returns the closest opponent to the player or None.
+        """
         best_distance = 200
         best = None
 
@@ -826,12 +1071,22 @@ class CTFPlayer(CTFMobile):
         return best
 
     def getObjectAngle(self, obj):
+        """
+        Returns the angle to an object.
+        If the angle is positive the object is to the right of the player.
+        If the angle is negitive the object is to the left of the player.
+        """
         if obj != None:
             return self.getAngle(obj.getLocation())
         else:
             return
 
     def getAngle(self, vect):
+        """
+        Vector angle crap. 
+        Given a vector and a players own locational vector what is the angle
+        to the given vector.
+        """
         toO = vect - self.getLocation()
         a = breve.breveInternalFunctionFinder.angle(self, self.heading, toO)
 
@@ -843,25 +1098,37 @@ class CTFPlayer(CTFMobile):
             return a
 
     def detectEdge(self):
+        """
+        Returns true if the player is at the edge of the world, 
+        false otherwise.
+        """
         return self.at_edge
 
     def iterate(self):
+        """
+        Handles the agents iterate loop.
+        """
+        # if in jail stay in jail
         if self.in_jail:
             self.move(self.jailed_location)
             return
 
+        # if we are carrying the flag, move the flag with us
         if self.carrying != None:
             self.carrying.move(self.getLocation())
 
+        # if we are turning left, actually turn left.
         if self.turning_left:
             self.turnLeft()
 
+        # if we are turning right, actually turn right.
         if self.turning_right:
             self.turnRight()
 
         myloc = self.getLocation()
         myvel = self.getHeading()
 
+        # check if we are at the edge of the world and stop if we are.
         if myloc.x > (WORLD_SIZE / 2) and myvel.x > 0.0:
             self.setSpeed(0)
             self.at_edge = True
@@ -877,19 +1144,30 @@ class CTFPlayer(CTFMobile):
         else:
             self.at_edge = False
 
+        # Get the rotational matrix
         myrot = self.getRotation()
 
+        # Do some vector multiplication
+        # and get the heading out of it!
         self.heading = myrot * breve.vector(0, 1, 0)
 
+        # set our velocity
+        # I don't remember why this works, but it does.
+        # Looks like half the speed times the heading vector 
+        # gives us our velocity vector
         self.setVelocity(.5 * self.velocity * self.heading)
 
+        # always hover above the ground a bit
         myloc.y = 0.2
 
+        # move to myloc
         self.move(myloc)
 
+        # call mobiles iterate 
         CTFMobile.iterate(self)
 
-breve.FlagSphere = FlagSphere
+# Let the breve namespace know we have these classes.
+breve.NoTagZone = NoTagZone
 breve.CTFController = CTFController
 breve.Flag = Flag
 breve.Jail = Jail
