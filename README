@@ -1,0 +1,27 @@
+= Capture The Flag
+
+A first-iteration "capture the flag" game for bots in the breve environment.
+Example bots written in Pythong, available in ctftemplate.py.
+Screenshot available on github homepage here: http://jdar.github.com/ctf
+
+
+NARG organizational website is at http://wiki.hacdc.org/index.php/NARG
+Documentation is at http://github.com/jdar/ctf/wikis/home/
+
+You need to install the breve environment at http://spiderland.org
+
+== Contribute
+ 
+* Fork the project.
+* Make your feature addition or bug fix.
+* Send me a pull request. Bonus points for topic branches.
+
+== Running
+ 
+  Put your bot in /bots
+  File > Start Simulation ( ⌘R )
+
+If you get errors on linux, you might have to use a different compiler.
+
+== Copyright
+  Bradford Barr
