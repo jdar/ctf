@@ -1,17 +1,42 @@
 import breve
 
+# Globals defines as follows
+# Too lazy to write a config file. Bad form on my part.
+
+# Dimensions of the world. World is WORLD_SIZExWORLD_SIZE units.
 WORLD_SIZE = 50
+
+# The maximum range a sensor can read
 SENSOR_DISTANCE = 20
 
-BLUE = 0
-RED = 1
+# Constants for identifying teams
+BLUE_TEAM = 0
+RED_TEAM = 1
 
+# Length of a single match in simulation time units.
 GAME_LENGTH = 500
+
+# Number of matches in a tournament
 TOURNAMENT_LENGTH = 5
+
+# Amount of time to pause before starting a new match.
 PAUSE_TIME = 75
 
 class CTFController(breve.Control):
+    """
+    Controls the state of the capture the flag game.
+    All actions are routed through the controller so each player
+    moves seemingly simultaniously. 
+    """
+
     def __init__(self):
+        """
+        Traditionally __init__ in breve python simulations is used 
+        for variable declarations. I follow that convention here.
+        init is called to actually initialize the instance variables.
+
+        NOTE: Calling the super classes __init__ method is manditory.
+        """
         breve.Control.__init__(self)
         self.left = None
         self.right = None
@@ -19,11 +44,11 @@ class CTFController(breve.Control):
         self.blue_flag = None
         self.red_jail = None
         self.blue_jail = None
-        self.red_p = 0
-        self.blue_p = 0
-        self.total_red_p = 0.0
-        self.total_blue_p = 0.0
-        self.iterations = 0.0
+        self.red_players_captured = 0
+        self.blue_players_captured = 0
+        self.total_red_flag_time = 0.0
+        self.total_blue_flag_time = 0.0
+        self.iterations = 1
         self.id_counter_1 = 0
         self.id_counter_2 = 0
         self.first_class = ''
@@ -34,10 +59,14 @@ class CTFController(breve.Control):
         self.pause_track = 0
         self.start_time = 0.0
         self.end_time = 0.0
+        self.winners_str = 'Red: %d  Blue: %d   Ties: %d'
 
         self.init()
 
     def init(self):
+        """
+        Set up the simulation.
+        """
         # Simulation settings
         self.disableReflections()
         self.enableLighting()
@@ -45,19 +74,26 @@ class CTFController(breve.Control):
         self.disableShadows()
         self.pointCamera(breve.vector(0, 0, 0), breve.vector(0, 60, 60))
         self.setIntegrationStep(.2)
+        self.interations = 0
 
         # Set up some text for the screen
-        self.setDisplayText('Red: $red_wins   Blue: $blue_wins   Ties: $ties', -.95, .6, 3)
+        # and interpolate the text properly (WOAH)
+        self.setDisplayText(self.winners_str % \
+                (self.red_wins, self.blue_wins, self.ties), -.3, .8, 3)
         self.setDisplayTextScale(.7)
 
-        # Set up timers
+        # Set up timers and the number of matches to play
         self.pause_track = 0.0
-        self.setTournamentLength(TOURNAMENT_LENGTH)
+        self.tournament_length = TOURNAMENT_LENGTH
 
         # Set up playing field
+        # First initialize the shape and set its size
         field_shape = breve.createInstances(breve.Cube, 1)
         field_shape.initWith(breve.vector(WORLD_SIZE/2, .2, WORLD_SIZE))
 
+        # Generate two halves of the playing field. 
+        # Set their shape the the shape we just created
+        # Change its color
         self.left = breve.createInstances(breve.Stationary, 1)
         self.left.register(field_shape, breve.vector(-1 * WORLD_SIZE / 4, 0, 0))
         self.left.setColor(breve.vector(.7, .7, 1.0))
@@ -67,222 +103,337 @@ class CTFController(breve.Control):
         self.right.setColor(breve.vector(1.0, .7, .7))
 
         # Set up the jails
+        # NOTE: Jail is a subclass of a breve class. We can use common
+        #       python syntax for pure python subclasses.
         self.blue_jail = Jail()
         self.blue_jail.move(breve.vector(WORLD_SIZE / 2 - 5, 0, WORLD_SIZE / 2 - 5))
-        self.blue_jail.setTeam(BLUE)
+        self.blue_jail.setTeam(BLUE_TEAM)
         
         self.red_jail = Jail()
         self.red_jail.move(breve.vector(-1 * WORLD_SIZE / 2 + 5, 0, -1 * WORLD_SIZE / 2 + 5))
-        self.red_jail.setTeam(RED)
+        self.red_jail.setTeam(RED_TEAM)
 
         # Set up the flags
+        # Randomness makes sure the position is random every time.
+        # The most common way to generate random vector is:
+        # breve.randomExpression(breve.vector(1, 1, 1)) - breve.vector(1, 1, 1)
+        # This ensures the random vector will be within (0, 0, 0) and (1, 1, 1)
+        # randomExpression knows how to generate random floats, ints, vectors and matrixs
+        # but python's random is always an option.
         randomness = breve.randomExpression(breve.vector(0, 0, WORLD_SIZE/2)) - breve.vector(0, 0, WORLD_SIZE/2)
 
         self.blue_flag = Flag()
-        self.blue_flag.setTeam(BLUE)
+        self.blue_flag.setTeam(BLUE_TEAM)
         self.blue_flag.move(breve.vector((-1 * WORLD_SIZE / 2) + 5, 1, 0) + randomness)
         self.blue_flag.makeBounds()
         self.blue_flag.setStartPosition(self.blue_flag.getLocation())
 
         self.red_flag = Flag()
-        self.red_flag.setTeam(RED)
+        self.red_flag.setTeam(RED_TEAM)
         self.red_flag.move(breve.vector((WORLD_SIZE / 2) - 5, 1, 0) + randomness)
         self.red_flag.makeBounds()
         self.red_flag.setStartPosition(self.red_flag.getLocation())
  
-    def setTournamentLength(self, length):
-        self.tournament_length = length
-
     def getBlueJailLocation(self):
+        """
+        Returns the location of the blue jail in breve vector form.
+        """
         return self.blue_jail.getLocation()
 
     def getRedJailLocation(self):
+        """
+        Returns the location of the red jail in breve vector form.
+        """
         return self.red_jail.getLocation()
 
     def getGameTime(self):
+        """
+        Returns the remaining game time, in simulation units.
+        """
         return self.getTime() - self.start_time
 
     def getRedWins(self):
+        """
+        Returns the number of red wins.
+        """
         return self.red_wins
 
     def getBlueWins(self):
+        """
+        Returns the number of blue wins.
+        """
         return self.blue_wins
 
     def getTies(self):
+        """
+        Returns the number of ties.
+        """
         return self.ties
 
     def resetWorld(self):
+        """
+        Resets the state of the world for a new match.
+        """
+        # Generate the randomness for the flag position
         location_randomizer = breve.randomExpression(breve.vector(0, 0, WORLD_SIZE/2))
         location_randomizer -= breve.vector(0, 0, WORLD_SIZE/4)
 
+        # Reset flag locations
         self.blue_flag.move(breve.vector(-1*WORLD_SIZE/2+5, 1, 0) + location_randomizer)
         self.blue_flag.resetFlag()
 
         self.red_flag.move(breve.vector(WORLD_SIZE/2-5, 1, 0) + location_randomizer)
         self.red_flag.resetFlag()
 
+        # Reset all of the player locations
+        # This call varies from traditional breve python syntax. To iterate over all
+        # objects of a certian class the call is usually:
+        # for item in breve.allInstances(CTFPlayer)
+        # But since CTFPlayer is a pure python subclass it is not added to the 
+        # breve object counter properly. We have to handle our own player count.
         for item in CTFPlayer.players:
             item.resetPlayer()
 
+        # set the pause timer, reset the iteration count
+        # reset the red and blue caputer count
+        # Display the winners of the match properly.
         self.pause_track = PAUSE_TIME
-        self.iterations = 0
-        self.red_p = 0
-        self.blue_p = 0
-        self.setDisplayText('Red: $redWins   Blue: $blueWins   Ties: $ties', -.95, .6, 3)
+        self.iterations = 1
+        self.red_players_captured = 0
+        self.blue_players_captured = 0
+        self.total_red_flag_time = 0.0
+        self.total_blue_flag_time = 0.0
+        self.setDisplayText(self.winners_str % \
+                (self.red_wins, self.blue_wins, self.ties), -.3, .8, 3)
 
-    def setText(self, text):
-        self.setDisplayText(text, -.95, -.95)
-
-    def winForRed(self):
-        print "*** The Red team wins! ***"
-        self.report()
-        self.red_wins += 1
-        if (self.red_wins + self.blue_wins + self.ties >= self.tournament_length):
-            self.reportWinner()
+    def winner(self, team):
+        """
+        Handles a game win!
+        """
+        # Print the winner to the log.
+        # Report some (very limited) stats.
+        # Add 1 to the win count for the appropriate team.
+        if team == RED_TEAM:
+            print "*** The Red team wins! ***"
+            self.red_wins += 1
+        elif team == BLUE_TEAM:
+            print "*** The Blue team wins! ***"
+            self.blue_wins += 1
         else:
-            self.resetWorld()
+            print "*** Tie Game ***"
+            self.ties += 1
 
-    def winForBlue(self):
-        print "*** The Blue team wins! ***"
         self.report()
-        self.blue_wins += 1
-        if (self.red_wins + self.blue_wins + self.ties >= self.tournament_length):
-            self.reportWinner()
-        else:
-            self.resetWorld()
 
-    def tie(self):
-        print "*** Tie Game ***"
-        self.report()
-        self.ties += 1
+        # If the tournament isn't over yet
+        # Report the winner otherwise reset the world.
         if (self.red_wins + self.blue_wins + self.ties >= self.tournament_length):
-            self.reportWinner()
+            self.reportTournamentWinner()
         else:
             self.resetWorld()
 
     def report(self):
-        self.total_red_p /= self.iterations
-        self.total_red_p *= 10
+        """
+        Logs minimal statistics to output window.
+        """
+        # Calculate the precentage of time red and blue had posetion of the flag for
+        ### BROKEN
+        self.total_red_flag_time /= self.iterations
+        self.total_red_flag_time *= 100
 
-        self.total_blue_p /= self.iterations
-        self.total_blue_p *= 10
+        self.total_blue_flag_time /= self.iterations
+        self.total_blue_flag_time *= 100
 
-        if self.blue_p == 10:
+        # Print start and stop times.
+        print "Game started at: ", self.start_time
+        print "Game ended at: ", self.end_time
+
+        # Mention if all of one team was captured.
+        if self.blue_players_captured == 10:
             print "All of the Blue players were captured."
-        if self.red_p == 10:
+        if self.red_players_captured == 10:
             print "All of the Red players were captured."
 
+        # Also mention who captured the flag
         if self.blue_flag.checkIfOffsides():
             print "The Blue flag was captured."
         if self.red_flag.checkIfOffsides():
             print "The Red flag was captured."
 
-        print "Blue had posession for $totalBlueP percent of the game."
-        print "Red had posession for $totalRedP percent of the game."
+        # Print out the holding statistics
+        # They look off to me...
+        # Almost better...
+        print "Blue had posession for %f percent of the game." % \
+                (self.total_blue_flag_time)
+        print "Red had posession for %f percent of the game." % \
+                (self.total_red_flag_time)
         print "*********************************************************" 
 
-    def reportWinner(self):
-        print "The Blue team won $blueWins games!"
-        print "The Red team won $blueWins games!"
-        print "There were $ties tie games!"
+    def reportTournamentWinner(self):
+        """
+        Reports the winner of the tournament.
+        """
+        # Print the win count to the console.
+        print "The Blue team won %d games!" % (self.blue_wins)
+        print "The Red team won %d games!" % (self.red_wins)
+        print "There were %d tie games!" % (self.ties)
+
+        # Print the tournament winner to the console.
         if self.blue_wins > self.red_wins:
             print "The Blue team wins the tournament!"
+            self.setDisplayText("Blue wins the Tournament!", -.3, .8, 3)
         elif self.red_wins > self.blue_wins:
             print "The Red team wins the tournament!"
+            self.setDisplayText("Red wins the Tournament!", -.3, .8, 3)
         else:
             print "Red and Blue tied!"
+            self.setDisplayText("The Tournament was a Tie!", -.3, .8, 3)
 
     def getJailedBlueCount(self):
-        return self.blue_p
+        """
+        Returns the number of blue players in jail.
+        Kept to make the API clearer.
+        """
+        return self.blue_players_captured
 
     def getJailedRedCount(self):
-        return self.red_p
+        """
+        Returns the number of red players in jail.
+        Kept to make the API clearer.
+        """
+        return self.red_players_captured
 
-    def changeRedPrisoners(self, n):
-        self.red_p += n
-
-    def changeBluePrisoners(self, n):
-        self.blue_p += n
+    def changePrisoners(self, team, n):
+        """
+        Changes the number of captured players (on the specified team) by n.
+        """
+        if team == RED_TEAM:
+            self.red_players_captured += n
+        else:
+            self.blue_players_captured += n
 
     def getNextIdNumber(self, agent):
+        """
+        Gets the next id number for the agent.
+        Used on agent initalization only.
+        """
+        # Set the class name of the first encountered class
         if self.first_class == "":
             self.first_class = agent.getType()
 
+        # If agents are part of the first encountered class
+        # Then use the first id counter
+        # Otherwise use the second
         if agent.getType() == self.first_class:
             self.id_counter_1 += 1
             return self.id_counter_1
-
-        self.id_counter_2 += 1
-        return self.id_counter_2
+        else:
+            self.id_counter_2 += 1
+            return self.id_counter_2
 
     def iterate(self):
+        """
+        Iterate method, runs the world another step.
+        """
+        # If the game is over let it rest.
+        if (self.red_wins + self.blue_wins + self.ties >= self.tournament_length):
+            return breve.Control.iterate(self)
+            
+
+        # If we are in a pause track, ignore the shit that
+        # usually needs to happen
         if self.pause_track > 0:
             self.pause_track -= 1
         else:
-            if self.iterations == 1:
+            # Check to see if the match is just starting.
+            # If it is log the start time.
+            # Iterations must be <= 2 because the engine can sort of 
+            # glance over timesteps. If set_time isn't properly set, 
+            # a timeout happens around game 5.
+            if self.iterations <= 2:
                 self.start_time = self.getTime()
 
+            # If the blue flag has moved, kill the no tag zone.
             if self.blue_flag.hasMoved():
                 self.blue_flag.killTheSphere()
 
+            # If the red flag has moved, kill the no tag zone.
             if self.red_flag.hasMoved():
                 self.red_flag.killTheSphere()
 
-            if self.red_p == 10:
-                self.winForBlue()
+            # If all the red players were captured, report a win for blue.
+            # Log end time.
+            if self.red_players_captured == 10:
                 self.end_time = self.getTime()
+                self.winner(BLUE_TEAM)
 
-            if self.blue_p == 10:
-                self.winForRed()
+            # If all the blue players were captured, report a win for red.
+            # Log end time.
+            if self.blue_players_captured == 10:
                 self.end_time = self.getTime()
+                self.winner(RED_TEAM)
 
+            # If the blue flag is on the red side. Red team has won.
+            # Log the end time.
             if self.blue_flag.checkIfOffsides():
-                self.winForRed()
                 self.end_time = self.getTime()
+                self.winner(RED_TEAM)
 
+            # If the red flag is on the red side. Blue team has won.
+            # Log the end time.
             if self.red_flag.checkIfOffsides():
-                self.winForBlue()
                 self.end_time = self.getTime()
+                self.winner(BLUE_TEAM)
 
-            if self.blue_flag.getCarrier() == None:
-                self.total_red_p += 1
+            # Counts the number of time units either team
+            # is in control of either flag.
+            if self.red_flag.getCarrier() != None:
+                self.total_blue_flag_time += 1
 
-            if self.red_flag.getCarrier() == None:
-                self.total_blue_p += 1
+            if self.blue_flag.getCarrier() != None:
+                self.total_red_flag_time += 1
 
             self.iterations += 1
-            self.game_time = self.getGameTime()
+            game_time = self.getGameTime()
 
-            if self.getGameTime() >= GAME_LENGTH: 
-                if self.end_time < self.start_time:
-                    r_avg = self.total_red_p / self.iterations
-                    b_avg = self.total_blue_p / self.iterations
+            # If time is up and no one has won.
+            # It's a tie.
+            if game_time >= GAME_LENGTH:
+                self.end_time = self.getTime()
+                self.winner(-1)
 
-                    if r_avg == b_avg:
-                        self.tie()
-                    elif r_avg > b_avg: 
-                        self.winForRed()
-                    else:
-                        self.winForBlue()
+            # NOTE: used to use a format string, 
+            #       but it noticably slowed down the simulation.
+            time_left_str = "Time Left: %.2f" % (500 - game_time)
 
-                    self.end_time = self.getTime()
-
-            self.setDisplayText("Game Time: $gameTime", 0)
+            self.setDisplayText(time_left_str, -.2, -.9, 0)
             breve.Control.iterate(self)
 
 class AgentShape(breve.CustomShape):
+    """
+    The pointy shape of an agent.
+    """
+
     def __init__(self):
+        """
+        Creates the new agent shape.
+        """
+        # make a breve custom shape class
         breve.CustomShape.__init__(self)
 
+        # define some points
         a = breve.vector(0, 1, 0)
         b = breve.vector(.25, 0, 0)
         c = breve.vector(-.25, 0, 0)
         d = breve.vector(0, -.1, .5)
 
+        # use those points to define planes
         self.addFace([a, b, c])
         self.addFace([a, b, d])
         self.addFace([a, c, d])
         self.addFace([d, c, b])
+
+        # finish the shape.
         self.finishShape(1.0)
 
 class CTFMobile(breve.Mobile): 
@@ -558,12 +709,12 @@ class CTFPlayer(CTFMobile):
             self.jailed_location = self.controller.getRedJailLocation()
             self.jailed_location += breve.randomExpression(breve.vector(1, 0, 1))
             self.jailed_location -= breve.vector(.5, -.5, .5)
-            self.controller.changeRedPrisoners(1)
+            self.controller.changePrisoners(RED_TEAM, 1)
         else:
             self.jailed_location = self.controller.getBlueJailLocation()
             self.jailed_location += breve.randomExpression(breve.vector(1, 0, 1))
             self.jailed_location -= breve.vector(.5, -.5, .5)
-            self.controller.changeBluePrisoners(1)
+            self.controller.changePrisoners(BLUE_TEAM, 1)
 
         self.move(self.jailed_location)
 
@@ -588,9 +739,9 @@ class CTFPlayer(CTFMobile):
         self.in_jail = False
 
         if self.team == 1:
-            self.controller.changeRedPrisoners(-1)
+            self.controller.changePrisoners(RED_TEAM, -1)
         else:
-            self.controller.changeBluePrisoners(-1)
+            self.controller.changePrisoners(BLUE_TEAM, -1)
 
     def accelerate(self):
         self.setSpeed(self.velocity + 0.1)
