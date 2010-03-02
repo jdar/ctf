@@ -5,12 +5,12 @@ import re
 def roundRobin(*bots):
     """ Generates a schedule of "fair" pairings. finds local bots by default, with list of bots an option """
 
-    if len(bots) == 0: # empty?
-	    os.getcwd() 
+    if len(bots) == 0:
+        os.getcwd() 
     	bot_names = set(glob.glob('*_bot.py'))
-	    for bot in bot_names:
-	        import bot_name
-    	    bots.append(eval(bot_name))        
+        for bot_name in bot_names:
+            import bot_name
+            bots.append(eval(bot_name))        
 
     if len(bots) % 2:
         bots.append(None)

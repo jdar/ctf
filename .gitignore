@@ -1,1 +1,2 @@
-bots/*
+*/*.pyc
+bots/*.py
